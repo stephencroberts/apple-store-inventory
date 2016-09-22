@@ -1,0 +1,38 @@
+{
+  "name": "check",
+  "runtime": "nodejs4.3",
+  "description": "Serverless Lambda function for project: apple-inventory",
+  "customName": false,
+  "customRole": false,
+  "handler": "handler.handler",
+  "timeout": 6,
+  "memorySize": 1024,
+  "authorizer": {},
+  "custom": {
+    "excludePatterns": []
+  },
+  "endpoints": [],
+  "events": [
+    {
+      "name": "check",
+      "type": "schedule",
+      "config": {
+        "enabled": "true",
+        "schedule": "rate(1 minute)"
+      }
+    }
+  ],
+  "environment": {
+    "SERVERLESS_PROJECT": "${project}",
+    "SERVERLESS_STAGE": "${stage}",
+    "SERVERLESS_REGION": "${region}",
+    "SERVERLESS_STORE": "${store}",
+    "SERVERLESS_PART_NUMBER": "${partNumber}",
+    "SERVERLESS_LOCATION": "${location}",
+    "SERVERLESS_TOPIC_ARN": "${topicArn}"
+  },
+  "vpc": {
+    "securityGroupIds": [],
+    "subnetIds": []
+  }
+}
