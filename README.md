@@ -14,9 +14,9 @@ Waiting impatiently for that new iPhone? You can use this script to get notified
 
 1. Clone this repo
 2. Run `npm install` to install dependencies
-3. Run `serverless project install` to set up the project
+3. Run `node_modules/.bin/serverless project install` to set up the project
 4. Configure `_meta/variables/s-variables-common.json` (see [Configuration](#configuration))
-5. Run `serverless dash deploy` to deploy all of the resources
+5. Run `node_modules/.bin/serverless dash deploy` to deploy all of the resources
 
 # Configuration
 
@@ -52,4 +52,8 @@ partNumber | String, Array | List of product part numbers
 location | String | Zip or City/State
 topicArn | String | AWS ARN of the SNS topic
 
-The only way I know to get the store number is by looking at the API call on Apple's website when you check product availability. Part numbers for new iPhone's can be found at https://www.techwalls.com/iphone-7-plus-model-differences/. The `topicArn` can be found in the AWS Console. 
+Store numbers can be found at http://www.istocknow.com/live. Part numbers for new iPhone's can be found at https://www.techwalls.com/iphone-7-plus-model-differences/. The `topicArn` can be found in the AWS Console. 
+
+# Resources
+
+A great tool to see live inventory for iPhone 7: http://www.istocknow.com/live/
