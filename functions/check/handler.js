@@ -1,97 +1,110 @@
 'use strict'
 
 let AWS = require('aws-sdk')
-let sns = new AWS.SNS()
 let http = require('http')
+let sns = new AWS.SNS()
 
-// Send notification to SNS topic
-function notify(store, part, cb) {
+/**
+ * Send notification to the SNS topic
+ *
+ * @param {String} storeName Store name
+ * @param {String} productName Product name
+ * @param {String} partNumber Part number
+ * @param {String} Status Availability status
+ * @returns {Promise} Promise, fulfilled after SNS publish
+ */
+function notify(storeName, productName, partNumber, status) {
 
-  let storeName = store.storeName
-  part = store.partsAvailability[part]
-
+  // Create SNS params
   var params = {
-    Message: `${part.storePickupProductTitle} ${part.partNumber} is ${part.pickupDisplay} at ${storeName}!`,
+    Message: `${productName} ${partNumber} is ${status} at ${storeName}!`,
     TopicArn: process.env.SERVERLESS_TOPIC_ARN
   }
+  
+  // Return a promise
+  return new Promise((resolve, reject) => {
 
-  sns.publish(params, cb)
+    // Publish message to the SNS topic
+    sns.publish(params, (result, err) => {
+      if (err) {
+        reject(err)
+      } else {
+        console.log(params)
+        resolve(result)
+      }
+    })
+  })
 }
 
-module.exports.handler = function(event, context, cb) {
+/**
+ * Lambda handler
+ */
+module.exports.handler = (event, context, cb) => {
 
   // Parse config
   let stores = process.env.SERVERLESS_STORE.split(',')
   let parts = process.env.SERVERLESS_PART_NUMBER.split(',')
   let location = process.env.SERVERLESS_LOCATION
 
-  // Query for each part
-  let cbCount = 0
-  parts.map(part => {
+  // Query for each part in the config
+  let promises = []
+  for (let part of parts) {
 
-    cbCount++
-
+    // Construct query with desired part and location
     let url = `http://www.apple.com/shop/retail/pickup-message?parts.0=${part}&location=${location}&little=true`
-    
-    http.get(url, (res) => {
-      
-      // Accumulate response
-      var body = ''
-      res.on('data', chunk => body += chunk )
 
-      // Once response is ready...
-      res.on('end', () => {
+    promises.push(new Promise((resolve, reject) => {
 
-        // Attempt to parse response as json
-        var response
-        try {
-          response = JSON.parse(body)
-        } catch (err) {
-          console.error(err)
-        }
+      http.get(url, (res) => {
 
-        // Filter stores by the ones defined in the config
-        var queryStores = response.body.stores
-        queryStores = queryStores.filter(store => stores.indexOf(store.storeNumber) !== -1)
+        // Accumulate response
+        let responseData = ''
+        res.on('data', chunk => responseData += chunk )
 
-        // Check each stores' inventory
-        queryStores.map(store => {
+        // Once response is ready...
+        res.on('end', () => {
 
-          // Check each part's availability
-          let parts = store.partsAvailability
-          for (let part in parts) {
+          let response
+          try {
+            response = JSON.parse(responseData)
+          } catch (err) {
+            return reject(err)
+          }
+          
+          // Filter stores by the ones defined in the config
+          var queryStores = response.body.stores
+          queryStores = queryStores.filter(store => stores.indexOf(store.storeNumber) !== -1)
 
-            let status = parts[part].pickupDisplay
-            if (status == 'available') {
-
-              // Increase callback count (another async call)
-              cbCount++
-
-              // Send notification
-              notify(store, part, (err, result) => {
-                if (err) console.error(err)
-
-                // Exit after all callbacks have completed
-                if (--cbCount == 0) {
-                  cb(null)
-                }
-              })
+          // Check each stores' inventory
+          let promises = []
+          for (let store of queryStores) {
+            
+            // Check part availability and send notification
+            let partDetails = store.partsAvailability[part]
+            if (partDetails && partDetails.pickupDisplay == 'available') {
+              promises.push(notify(store.storeName, partDetails.storePickupProductTitle, partDetails.partNumber, partDetails.pickupDisplay))
             }
           }
+
+          // After all notifications have sent, fulfill this request
+          Promise.all(promises).then((result) => {
+            resolve(result)
+          }).catch((err) => {
+            reject(err)
+          })
         })
-
-        // Exit after all callbacks have completed
-        if (--cbCount == 0) {
-          cb(null)
-        }
+      }).on('error', function(err){
+        reject(err)
       })
-    }).on('error', function(err){
-        console.error(err)
+    }))
+  }
 
-        // Exit after all callbacks have completed
-        if (--cbCount == 0) {
-          cb(null)
-        }
-    })
+  // After all requests have been fulfilled
+  Promise.all(promises).then((result) => {
+    cb(null, "Done!")
+  }).catch((err) => {
+    console.log("TEST")
+    console.error(err, err.stack)
+    cb(err)
   })
 }
